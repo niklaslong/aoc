@@ -2,6 +2,9 @@
 
 use std::io::BufRead;
 use std::str::FromStr;
+use std::sync::mpsc::channel;
+
+use tokio::task;
 
 fn main() {
     let stdin = std::io::stdin();
@@ -35,6 +38,26 @@ fn find_pair(v: &Vec<u64>) -> (u64, u64) {
     }
 
     (a, b)
+}
+
+fn find_pair_parallel(v: &Vec<u64>) -> (u64, u64) {
+    let (sender, receiver) = channel();
+
+    for i in v {
+        for j in v {
+            let sender_in = sender.clone();
+            let a = *i;
+            let b = *j;
+
+            std::thread::spawn(move || {
+                if a + b == 2020 {
+                    sender_in.send((a, b)).unwrap();
+                }
+            });
+        }
+    }
+
+    receiver.recv().unwrap()
 }
 
 fn find_trio(v: &Vec<u64>) -> (u64, u64, u64) {
@@ -73,6 +96,14 @@ mod tests {
     }
 
     #[test]
+    fn finds_the_pair_async() {
+        let expense_report = vec![1721, 979, 366, 299, 675, 1456];
+        let (a, b) = find_pair_parallel(&expense_report);
+
+        assert_eq!(a * b, 514579);
+    }
+
+    #[test]
     fn finds_the_trio() {
         let expense_report = vec![1721, 979, 366, 299, 675, 1456];
         let (a, b, c) = find_trio(&expense_report);
@@ -104,6 +135,11 @@ mod tests {
     fn bench_pair(b: &mut Bencher) {
         b.iter(|| find_pair(&expense_report()));
     }
+
+   // #[bench]
+   // fn bench_pair_multi_threaded(b: &mut Bencher) {
+   //     b.iter(|| find_pair_parallel(&expense_report()));
+   // }
 
     #[bench]
     fn bench_trio(b: &mut Bencher) {
